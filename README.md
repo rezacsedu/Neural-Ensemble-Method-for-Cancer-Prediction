@@ -1,4 +1,4 @@
-# Cancer risk and type prediction based on CNV with LSTM and DBN networks
+# Why and how to use this repository? 
 Code and supplementary materials for the paper titled "Cancer Risk and Type Prediction Based on Copy Number Variations with LSTM and Deep Belief Networks" submitted to Artificial Intelligence International Conference – A2IC 2018, Barcelona, Spain, November 2018. 
 
 ## Initial preprocessing
@@ -29,9 +29,19 @@ TCGA provides gene locations as cytobands. To convert cytobands to DNA coordinat
 3. preprocess_gene_list:
 Now that we have extracted gene details, we need to process gene data to remove noise. For example, chromosome names 'X', 'Y' are represented as 23, 24 respectively. Remove duplicate gene names etc.
 
-
 ## Final dataset with oncogenes:
 common_moduls->prepare_input_data: here only the oncogenes are taken as features. In TCGA data, is_cancer_gene_census = True are the oncogenes. 
 
 ## Final dataset with all genes
 Recursive feature elimination: common_moduls->feature_ranking: We used Recursive Feature Elimination(RFE) from sklearn.feature_selection. 
+
+## Citation request
+    @inproceedings{karim2018recurrent,
+        title={Recurrent Deep Embedding Networks for Genotype Clustering and Ethnicity Prediction},
+        author={Karim, Md and Cochez, Michael and Beyan, Oya Deniz and Zappa, Achille and Sahay, Ratnesh and Decker, Stefan and Schuhmann, Dietrich-Rebholz and others},
+        booktitle={arXiv preprint arXiv:1805.12218},
+        year={2018}
+    }
+
+## Contributing
+For any questions, feel free to open an issue or contact at rezaul.karim@rwth-aachen.de
