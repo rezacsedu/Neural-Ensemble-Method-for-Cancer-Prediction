@@ -37,9 +37,9 @@ Recursive feature elimination: common_moduls->feature_ranking: We used Recursive
 
 ## Citation request
     @inproceedings{karim2018recurrent,
-        title={Recurrent Deep Embedding Networks for Genotype Clustering and Ethnicity Prediction},
-        author={Karim, Md and Cochez, Michael and Beyan, Oya Deniz and Zappa, Achille and Sahay, Ratnesh and Decker, Stefan and Schuhmann, Dietrich-Rebholz and others},
-        booktitle={arXiv preprint arXiv:1805.12218},
+        title={Cancer Risk and Type Prediction Based on Copy Number Variations with LSTM and Deep Belief Networks},
+        author={Karim, Md Rezaul and Rahman, Md Ashiqur and Decker, Stefan and Beyan Deniz},
+        booktitle={Artificial Intelligence International Conference (A2IC2018)},
         year={2018}
     }
 
