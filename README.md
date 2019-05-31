@@ -4,7 +4,7 @@ Code and supplementary materials for the following two papers:
 * "Cancer Risk and Type Prediction Based on Copy Number Variations with LSTM and Deep Belief Networks" submitted to Artificial Intelligence International Conference – A2IC 2018, Barcelona, Spain, November 2018. 
 * "A snapshot neural ensemble method for cancer type prediction based on copy number variations", submitted to Journal of Neural Computing and Applications. 
 
-## Initial preprocessing
+### Initial preprocessing
 TCGA provide samples from each patient in a single .txt file. CNV data is extracted from these sample files and merged all together in a sinle .csv file. These data processing is done in raw_cnv_data_processing module. This module has four functions
 
 1. merge_cancer_files:
@@ -19,7 +19,7 @@ In previous two functions, we mainly extracted data from txt files to a single c
 4. generate_data_summary:
 Here we generate a simple statistical sumaary on the data. For example, total no of samples, total CNVs, no of CNVs per sample, average CNVs per male, female samples etc. 
 
-## Gene data processing
+### Gene data processing
 For final data processing we need human gene list along with their locations. TCGA provides gene details as json format. Gene processing is done in gene_data_processing module.
 
 1. extract_gene_names:
@@ -31,20 +31,20 @@ TCGA provides gene locations as cytobands. To convert cytobands to DNA coordinat
 3. preprocess_gene_list:
 Now that we have extracted gene details, we need to process gene data to remove noise. For example, chromosome names 'X', 'Y' are represented as 23, 24 respectively. Remove duplicate gene names etc.
 
-### Final CNVs with oncogenes:
+#### Final CNVs with oncogenes:
 common_moduls->prepare_input_data: here only the oncogenes are taken as features. In TCGA data, is_cancer_gene_census = True are the oncogenes. 
 
-### Final CNVs with protein-coding genes
+#### Final CNVs with protein-coding genes
 Recursive feature elimination: common_moduls->feature_ranking: We used Recursive Feature Elimination(RFE) from sklearn.feature_selection. 
 
-## A quick example
+### A quick example
 A quick example on a small dataset can be performed as follows: 
 * $ cd GradCAM
 * $ python3 load_data.py (make sure that the data in CSV format in the 'data' folder)
 * $ python3 model.py
 * $ python3 grad_cam.py
 
-## Citation request
+### Citation request
 If you use the code of this repository in your research, please consider citing the folowing papers:
 
     @inproceedings{karim2018recurrent,
@@ -60,5 +60,5 @@ If you use the code of this repository in your research, please consider citing 
         year={2019}
     }
 
-## Contributing
+### Contributing
 For any questions, feel free to open an issue or contact at rezaul.karim@rwth-aachen.de
