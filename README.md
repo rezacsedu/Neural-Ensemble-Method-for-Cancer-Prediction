@@ -16,7 +16,6 @@ In previous two functions, we mainly extracted data from txt files to a single c
 4. generate_data_summary:
 Here we generate a simple statistical sumaary on the data. For example, total no of samples, total CNVs, no of CNVs per sample, average CNVs per male, female samples etc. 
 
-
 ## Gene data processing
 For final data processing we need human gene list along with their locations. TCGA provides gene details as json format. Gene processing is done in gene_data_processing module.
 
@@ -34,6 +33,12 @@ common_moduls->prepare_input_data: here only the oncogenes are taken as features
 
 ## Final dataset with all genes
 Recursive feature elimination: common_moduls->feature_ranking: We used Recursive Feature Elimination(RFE) from sklearn.feature_selection. 
+
+## A quick example
+A quick example on a small dataset can be performed as follows: 
+* python3 load_data.py
+* python3 model.py
+* python3 grad_cam.py
 
 ## Citation request
     @inproceedings{karim2018recurrent,
