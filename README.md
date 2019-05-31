@@ -1,4 +1,4 @@
-# Why and how to use this repository? 
+## A snapshot neural ensemble method for cancer type prediction based on copy number variations
 Code and supplementary materials for the following two papers:
 
 * "Cancer Risk and Type Prediction Based on Copy Number Variations with LSTM and Deep Belief Networks" submitted to Artificial Intelligence International Conference – A2IC 2018, Barcelona, Spain, November 2018. 
