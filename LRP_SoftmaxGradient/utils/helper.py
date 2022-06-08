@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def heatmap(heatmap, cmap="seismic", interpolation="none", colorbar=False, M=None):
     if M is None:
         M = np.abs(heatmap).max()
