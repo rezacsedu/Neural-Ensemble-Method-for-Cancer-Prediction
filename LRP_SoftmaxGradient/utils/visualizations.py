@@ -10,12 +10,12 @@ class _SoftMax(Layer):
     def call(self, x):
         return [K.softmax(tmp) for tmp in iutils.to_list(x)]
 
+
 class _MaskedGuidedBackprop(GuidedBackprop):
-    def __init__(self, 
-                 model,
-                 R_mask, 
-                 **kwargs):
-        super(_MaskedGuidedBackprop, self).__init__(model, neuron_selection_mode="all", **kwargs)
+    def __init__(self, model, R_mask, **kwargs):
+        super(_MaskedGuidedBackprop, self).__init__(
+            model, neuron_selection_mode="all", **kwargs
+        )
         self.initialize_r_mask(R_mask)
 
     def initialize_r_mask(self, R_mask):
@@ -35,35 +35,32 @@ class _MaskedGuidedBackprop(GuidedBackprop):
 
 
 class GBP(_MaskedGuidedBackprop):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 relu=False,
-                 **kwargs):
+    def __init__(self, model, target_id, relu=False, **kwargs):
         """ターゲット:predictionの値，それ以外0
         Arguments:
             model {[type]} -- [description]
             target_id {[type]} -- [description]
             predictions {[type]} -- [description]
         """
-        self.relu=relu
+        self.relu = relu
         R_mask = np.zeros(model.output_shape[1])
         R_mask[target_id] = 1
         super(GBP, self).__init__(model, R_mask=R_mask, **kwargs)
-    
+
     def analyze(self, inputs):
         if self.relu:
             return np.maximum(super(GBP, self).analyze(inputs), 0)
         else:
             return super(GBP, self).analyze(inputs)
-        
+
+
 class _MaskedDeepTaylor(BoundedDeepTaylor):
-    """Give any specific path to the DTD
-    """
+    """Give any specific path to the DTD"""
 
     def __init__(self, model, R_mask, **kwargs):
         super(_MaskedDeepTaylor, self).__init__(
-            model, neuron_selection_mode="all", **kwargs)
+            model, neuron_selection_mode="all", **kwargs
+        )
         self.initialize_r_mask(R_mask)
 
     def initialize_r_mask(self, R_mask):
@@ -75,20 +72,13 @@ class _MaskedDeepTaylor(BoundedDeepTaylor):
         self.R_mask = K.constant(R_mask)
 
     def _head_mapping(self, X):
-        """Multiplication with the initialized one-hot vector
-        """
+        """Multiplication with the initialized one-hot vector"""
         initial_R = Lambda(lambda x: (x * self.R_mask))(X)
         return initial_R
 
 
 class LRP(_MaskedDeepTaylor):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 relu=False,
-                 low=-1.,
-                 high=1.,
-                 **kwargs):
+    def __init__(self, model, target_id, relu=False, low=-1.0, high=1.0, **kwargs):
         """Target value:same as prediction，otherwise:0
         Arguments:
             model {[type]} -- [description]
@@ -99,20 +89,16 @@ class LRP(_MaskedDeepTaylor):
         R_mask = np.zeros((model.output_shape[1]))
         R_mask[target_id] = 1
         super(LRP, self).__init__(model, R_mask=R_mask, low=low, high=high, **kwargs)
-                
+
     def analyze(self, inputs):
         if self.relu:
             return np.maximum(super(LRP, self).analyze(inputs), 0)
         else:
             return super(LRP, self).analyze(inputs)
-        
-        
+
+
 class _LRPSubtraction(object):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 scaling=True, 
-                 **kwargs):
+    def __init__(self, model, target_id, scaling=True, **kwargs):
         self.model = model
         self.target_id = target_id
         self.scaling = scaling
@@ -139,19 +125,15 @@ class _LRPSubtraction(object):
         equal_magnification = 1
         if self.scaling:
             equal_magnification = analysis_target.sum(
-                axis=(1, 2, 3), keepdims=True) / analysis_others.sum(
-                    axis=(1, 2, 3), keepdims=True)
+                axis=(1, 2, 3), keepdims=True
+            ) / analysis_others.sum(axis=(1, 2, 3), keepdims=True)
         analysis = analysis_target - analysis_others * equal_magnification
         return analysis
-    
-    
+
+
 class _CLRPBase(BoundedDeepTaylor):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 **kwargs):
-        super(_CLRPBase, self).__init__(
-            model, neuron_selection_mode="all", **kwargs)
+    def __init__(self, model, target_id, **kwargs):
+        super(_CLRPBase, self).__init__(model, neuron_selection_mode="all", **kwargs)
         self.target_id = target_id
         self.class_num = model.output_shape[1]
         self.initialize_r_mask()
@@ -163,7 +145,8 @@ class _CLRPBase(BoundedDeepTaylor):
         target_value = Lambda(lambda x: (x[:, self.target_id]))(X)
         X = Lambda(lambda x: (x[:, None] * self.R_mask))(target_value)
         return X
-    
+
+
 class _CLRPTarget(_CLRPBase):
     def initialize_r_mask(self):
         R_mask = np.zeros(self.class_num)
@@ -172,8 +155,7 @@ class _CLRPTarget(_CLRPBase):
 
 
 class _CLRPOthers(_CLRPBase):
-    """R dual for CLRP1
-    """
+    """R dual for CLRP1"""
 
     def initialize_r_mask(self):
         R_mask = np.ones(self.class_num)
@@ -183,35 +165,29 @@ class _CLRPOthers(_CLRPBase):
 
 
 class CLRP(_LRPSubtraction):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 relu=False,
-                 low=-1.,
-                 high=1.,
-                 **kwargs):
-        super(CLRP, self).__init__(model, target_id=target_id, low=low, high=high, **kwargs)
+    def __init__(self, model, target_id, relu=False, low=-1.0, high=1.0, **kwargs):
+        super(CLRP, self).__init__(
+            model, target_id=target_id, low=low, high=high, **kwargs
+        )
         self.relu = relu
-        
+
     def _get_target_analyzer(self, **kwargs):
         return _CLRPTarget(self.model, target_id=self.target_id, **kwargs)
 
     def _get_others_analyzer(self, **kwargs):
         return _CLRPOthers(self.model, target_id=self.target_id, **kwargs)
-    
+
     def analyze(self, inputs):
         if self.relu:
             return np.maximum(super(CLRP, self).analyze(inputs), 0)
         else:
             return super(CLRP, self).analyze(inputs)
-    
+
+
 class _SGLRPBase(BoundedDeepTaylor):
-    """Initialize R with Softmax Gradient
-    """
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 **kwargs):
+    """Initialize R with Softmax Gradient"""
+
+    def __init__(self, model, target_id, **kwargs):
         super(_SGLRPBase, self).__init__(model, neuron_selection_mode="all", **kwargs)
         self.target_id = target_id
         self.class_num = model.output_shape[1]
@@ -219,13 +195,12 @@ class _SGLRPBase(BoundedDeepTaylor):
 
     def initialize_r_mask(self):
         raise NotImplementedError
-    
-   
+
     def _head_mapping(self, X):
         """
         target:yt(1-yt)  base: ytyi
         """
-        
+
         # target is 1, else 0
         Kronecker_delta = np.zeros(self.class_num)
         Kronecker_delta[self.target_id] = 1
@@ -235,15 +210,16 @@ class _SGLRPBase(BoundedDeepTaylor):
         Inv_Kronecker_delta = np.ones(self.class_num)
         Inv_Kronecker_delta[self.target_id] = 0
         Inv_Kronecker_delta = K.constant(Inv_Kronecker_delta)
-        
+
         X = _SoftMax()(X)
         target_value = Lambda(lambda x: (x[:, self.target_id]))(X)
 
-
         X = Lambda(
-            lambda x: x * (1 - x) * Kronecker_delta + x * Inv_Kronecker_delta * target_value[:, None],
-            output_shape=lambda input_shape: (None, int(input_shape[1])))(X)
-        
+            lambda x: x * (1 - x) * Kronecker_delta
+            + x * Inv_Kronecker_delta * target_value[:, None],
+            output_shape=lambda input_shape: (None, int(input_shape[1])),
+        )(X)
+
         X = Lambda(lambda x: (self.R_mask * x))(X)
         return X
 
@@ -263,22 +239,18 @@ class _SGLRPDual(_SGLRPBase):
 
 
 class SGLRP(_LRPSubtraction):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 relu=False,
-                 low=-1.,
-                 high=1.,
-                 **kwargs):
-        super(SGLRP, self).__init__(model, target_id=target_id, low=low, high=high, **kwargs)
+    def __init__(self, model, target_id, relu=False, low=-1.0, high=1.0, **kwargs):
+        super(SGLRP, self).__init__(
+            model, target_id=target_id, low=low, high=high, **kwargs
+        )
         self.relu = relu
-        
+
     def _get_target_analyzer(self, **kwargs):
         return _SGLRPTarget(self.model, target_id=self.target_id, **kwargs)
 
     def _get_others_analyzer(self, **kwargs):
         return _SGLRPDual(self.model, target_id=self.target_id, **kwargs)
-    
+
     def analyze(self, inputs):
         if self.relu:
             return np.maximum(super(SGLRP, self).analyze(inputs), 0)
@@ -287,12 +259,9 @@ class SGLRP(_LRPSubtraction):
 
 
 class _SGLRP2Base(BoundedDeepTaylor):
-    """Initialize R with Softmax Gradient
-    """
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 **kwargs):
+    """Initialize R with Softmax Gradient"""
+
+    def __init__(self, model, target_id, **kwargs):
         super(_SGLRP2Base, self).__init__(model, neuron_selection_mode="all", **kwargs)
         self.target_id = target_id
         self.class_num = model.output_shape[1]
@@ -300,14 +269,14 @@ class _SGLRP2Base(BoundedDeepTaylor):
 
     def initialize_r_mask(self):
         raise NotImplementedError
-    
+
     def _head_mapping(self, X):
         """
         target:yt，others:ytyj/(1-yt)
         """
-        # It's possible to have a perfect prediction. A small amount is added to prevent problems. 
-        epsilon = 1e-6 
-        
+        # It's possible to have a perfect prediction. A small amount is added to prevent problems.
+        epsilon = 1e-6
+
         Kronecker_delta = np.zeros(self.class_num)
         Kronecker_delta[self.target_id] = 1
         Kronecker_delta = K.constant(Kronecker_delta)
@@ -320,8 +289,13 @@ class _SGLRP2Base(BoundedDeepTaylor):
 
         X = _SoftMax()(X)
         X = Lambda(
-            lambda x: x * (Kronecker_delta) - x * (Inv_Kronecker_delta) * target_value[:, None] / (1 - target_value[:, None] + epsilon),
-            output_shape=lambda input_shape: (None, int(input_shape[1])))(X)
+            lambda x: x * (Kronecker_delta)
+            - x
+            * (Inv_Kronecker_delta)
+            * target_value[:, None]
+            / (1 - target_value[:, None] + epsilon),
+            output_shape=lambda input_shape: (None, int(input_shape[1])),
+        )(X)
 
         X = Lambda(lambda x: (self.R_mask * x))(X)
         return X
@@ -339,49 +313,41 @@ class _SGLRP2Dual(_SGLRP2Base):
         R_mask = np.ones(self.class_num)
         R_mask[self.target_id] = 0
         self.R_mask = K.constant(R_mask)
-        
+
+
 class SGLRP2(_LRPSubtraction):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 relu=False,
-                 low=-1.,
-                 high=1.,
-                 **kwargs):
-        super(SGLRP2, self).__init__(model, target_id=target_id, low=low, high=high, **kwargs)
+    def __init__(self, model, target_id, relu=False, low=-1.0, high=1.0, **kwargs):
+        super(SGLRP2, self).__init__(
+            model, target_id=target_id, low=low, high=high, **kwargs
+        )
         self.relu = relu
-        
+
     def _get_target_analyzer(self, **kwargs):
         return _SGLRP2Target(self.model, target_id=self.target_id, **kwargs)
 
     def _get_others_analyzer(self, **kwargs):
         return _SGLRP2Dual(self.model, target_id=self.target_id, **kwargs)
-    
+
     def analyze(self, inputs):
         if self.relu:
             return np.maximum(super(SGLRP2, self).analyze(inputs), 0)
         else:
             return super(SGLRP2, self).analyze(inputs)
-        
-        
+
+
 class GradCAM(object):
-    def __init__(self,
-                 model,
-                 target_id,
-                 layer_name="block5_pool",
-                 relu=False,
-                 **kwargs):
+    def __init__(
+        self, model, target_id, layer_name="block5_pool", relu=False, **kwargs
+    ):
 
         class_output = model.output[:, target_id]
 
-        conv_output = model.get_layer(
-            layer_name).output  
-        grads = K.gradients(class_output, conv_output)[
-            0]  
+        conv_output = model.get_layer(layer_name).output
+        grads = K.gradients(class_output, conv_output)[0]
         self.gradient_function = K.function(
             [model.input],
             [conv_output, grads],
-        ) 
+        )
         self.relu = relu
 
     def analyze(self, inputs):
@@ -389,28 +355,36 @@ class GradCAM(object):
 
         weights = np.mean(grads_vals, axis=(1, 2))
         cams = (outputs * weights[:, np.newaxis, np.newaxis, :]).sum(
-            axis=3, keepdims=True)
-                
-        resized_cams = resize(cams, np.shape(inputs), mode='reflect', anti_aliasing=True)
+            axis=3, keepdims=True
+        )
+
+        resized_cams = resize(
+            cams, np.shape(inputs), mode="reflect", anti_aliasing=True
+        )
 
         if self.relu:
             return np.maximum(resized_cams, 0)
         else:
             return resized_cams
-    
-        
+
+
 class GuidedGradCAM(object):
-    def __init__(self, 
-                 model, 
-                 target_id, 
-                 layer_name="block5_pool",
-                 relu=False,
-                 **kwargs):
+    def __init__(
+        self, model, target_id, layer_name="block5_pool", relu=False, **kwargs
+    ):
         self.model = model
         self.target_id = target_id
         self.relu = relu
-        self.gradcam = GradCAM(self.model, target_id=self.target_id, layer_name=layer_name, relu=relu, **kwargs)
-        self.guidedbackprop = GBP(self.model, target_id=self.target_id, relu=relu, **kwargs)
-                
+        self.gradcam = GradCAM(
+            self.model,
+            target_id=self.target_id,
+            layer_name=layer_name,
+            relu=relu,
+            **kwargs
+        )
+        self.guidedbackprop = GBP(
+            self.model, target_id=self.target_id, relu=relu, **kwargs
+        )
+
     def analyze(self, inputs):
         return self.gradcam.analyze(inputs) * self.guidedbackprop.analyze(inputs)

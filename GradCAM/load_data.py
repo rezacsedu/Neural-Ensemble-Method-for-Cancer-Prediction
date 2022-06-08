@@ -2,10 +2,8 @@ import os
 
 import numpy as np
 import pandas as pd
-import sklearn
 from sklearn.model_selection import KFold
 from skimage import io
-from shutil import copyfile
 
 TRAIN_DATA_PATH = "data/TCGA_train.csv"
 subfolder_train_path = "data/embedding_2d/train"
@@ -27,10 +25,10 @@ def transform_fetaures():
         zeros = np.zeros((205,), dtype=np.float32)
         X_conc = np.concatenate((X, zeros))
         X_shaped = np.reshape(X_conc, (144, 144))
-        dir = subfolder_train_path + '/' + str(Y)
+        dir = subfolder_train_path + "/" + str(Y)
         if not os.path.exists(dir):
             os.makedirs(dir)
-        file_path = dir + '/' + str(i) + '.png'
+        file_path = dir + "/" + str(i) + ".png"
         io.imsave(file_path, X_shaped)
 
 
@@ -65,11 +63,17 @@ def toCrossValidation(folds):
 
 def copy(source_dir, dist_dir, file):
     from shutil import copyfile
+
     copyfile(source_dir + "/" + file, dist_dir + "/" + file)
 
 
 def numbers_to_genes(numbers):
-    df = pd.read_csv("data/gene_list.csv", delimiter="\t", index_col="gene_id", usecols=["gene_id", "name"])
+    df = pd.read_csv(
+        "data/gene_list.csv",
+        delimiter="\t",
+        index_col="gene_id",
+        usecols=["gene_id", "name"],
+    )
     dict = df.to_dict()["name"]
     res = []
     for number in numbers:
@@ -77,6 +81,6 @@ def numbers_to_genes(numbers):
     return res
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     arr = np.array([1, 2])
     numbers_to_genes(arr)

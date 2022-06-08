@@ -3,8 +3,6 @@ import numpy as np
 import cv2
 import pandas as pd
 from matplotlib import pyplot as plt
-from matplotlib.patches import Circle
-import matplotlib.cbook as cbook
 from keras import backend as K
 from keras.preprocessing import image
 
@@ -39,12 +37,13 @@ def build_model():
 
 # ---------------------------------------------------------------------
 
+
 def load_image(path, preprocess=True):
     """Load and preprocess image."""
     x = image.load_img(path, target_size=(H, W), color_mode="grayscale")
     x = image.img_to_array(x)
     if preprocess:
-        x = x / 255.
+        x = x / 255.0
         x = np.expand_dims(x, axis=0)
         # x = preprocess_input(x)
     return x
@@ -59,7 +58,7 @@ def deprocess_image(x):
         x = np.squeeze(x)
     # normalize tensor: center on 0., ensure std is 0.1
     x -= x.mean()
-    x /= (x.std() + 1e-5)
+    x /= x.std() + 1e-5
     x *= 0.1
 
     # clip to [0, 1]
@@ -68,9 +67,9 @@ def deprocess_image(x):
 
     # convert to RGB array
     x *= 255
-    if K.image_dim_ordering() == 'th':
+    if K.image_dim_ordering() == "th":
         x = x.transpose((1, 2, 0))
-    x = np.clip(x, 0, 255).astype('uint8')
+    x = np.clip(x, 0, 255).astype("uint8")
     return x
 
 
@@ -86,14 +85,16 @@ def build_guided_model():
     according to Guided Backpropagation.
     """
     if "GuidedBackProp" not in ops._gradient_registry._registry:
+
         @ops.RegisterGradient("GuidedBackProp")
         def _GuidedBackProp(op, grad):
             dtype = op.inputs[0].dtype
-            return grad * tf.cast(grad > 0., dtype) * \
-                   tf.cast(op.inputs[0] > 0., dtype)
+            return (
+                grad * tf.cast(grad > 0.0, dtype) * tf.cast(op.inputs[0] > 0.0, dtype)
+            )
 
     g = tf.get_default_graph()
-    with g.gradient_override_map({'Relu': 'GuidedBackProp'}):
+    with g.gradient_override_map({"Relu": "GuidedBackProp"}):
         new_model = build_model()
     return new_model
 
@@ -134,14 +135,18 @@ def grad_cam(input_model, image, cls, layer_name):
 def grad_cam_batch(input_model, images, classes, layer_name):
     """GradCAM method for visualizing input saliency.
     Same as grad_cam but processes multiple images in one run."""
-    loss = tf.gather_nd(input_model.output, np.dstack([range(images.shape[0]), classes])[0])
+    loss = tf.gather_nd(
+        input_model.output, np.dstack([range(images.shape[0]), classes])[0]
+    )
     layer_output = input_model.get_layer(layer_name).output
     grads = K.gradients(loss, layer_output)[0]
-    gradient_fn = K.function([input_model.input, K.learning_phase()], [layer_output, grads])
+    gradient_fn = K.function(
+        [input_model.input, K.learning_phase()], [layer_output, grads]
+    )
 
     conv_output, grads_val = gradient_fn([images, 0])
     weights = np.mean(grads_val, axis=(1, 2))
-    cams = np.einsum('ijkl,il->ijk', conv_output, weights)
+    cams = np.einsum("ijkl,il->ijk", conv_output, weights)
 
     # Process CAMs
     new_cams = np.empty((images.shape[0], W, H))
@@ -155,11 +160,19 @@ def grad_cam_batch(input_model, images, classes, layer_name):
     return new_cams
 
 
-def compute_saliency(model, guided_model, img_path, layer_name='block5_conv3', cls=-1, visualize=True, save=None,
-                     img_name=str(K_FOLD)):
+def compute_saliency(
+    model,
+    guided_model,
+    img_path,
+    layer_name="block5_conv3",
+    cls=-1,
+    visualize=True,
+    save=None,
+    img_name=str(K_FOLD),
+):
     """Compute saliency using all three approaches.
-        -layer_name: layer to compute gradients;
-        -cls: class number to localize (-1 for most probable class).
+    -layer_name: layer to compute gradients;
+    -cls: class number to localize (-1 for most probable class).
     """
     preprocessed_input = load_image(img_path)
 
@@ -189,38 +202,40 @@ def compute_saliency(model, guided_model, img_path, layer_name='block5_conv3', c
         # jetcam = (np.float32(jetcam) + load_image(img_path, preprocess=False)) / 2
         # cv2.imwrite(join(path_guided_gradcam, picure_name), deprocess_image(jetcam))
 
-        jetcam = cv2.applyColorMap(np.uint8(255 * deprocess_image(guided_gradcam[0])), cv2.COLORMAP_WINTER)
+        jetcam = cv2.applyColorMap(
+            np.uint8(255 * deprocess_image(guided_gradcam[0])), cv2.COLORMAP_WINTER
+        )
         cv2.imwrite(join(path_guided_gradcam, img_name), jetcam)
 
     if visualize:
         plt.figure(figsize=(15, 10))
         plt.subplot(131)
-        plt.title('GradCAM')
-        plt.axis('off')
+        plt.title("GradCAM")
+        plt.axis("off")
         plt.imshow(load_image(img_path, preprocess=False))
-        plt.imshow(gradcam, cmap='jet', alpha=0.5)
+        plt.imshow(gradcam, cmap="jet", alpha=0.5)
 
         plt.subplot(132)
-        plt.title('Guided Backprop')
-        plt.axis('off')
+        plt.title("Guided Backprop")
+        plt.axis("off")
         plt.imshow(np.flip(deprocess_image(gb[0]), -1))
 
         plt.subplot(133)
-        plt.title('Guided GradCAM')
-        plt.axis('off')
+        plt.title("Guided GradCAM")
+        plt.axis("off")
         plt.imshow(np.flip(deprocess_image(guided_gradcam[0]), -1))
         plt.show()
 
     return gradcam, gb, guided_gradcam
 
 
-def compute_saliency_for_classes(layer_name='last_conv', colormap=True):
-    '''
+def compute_saliency_for_classes(layer_name="last_conv", colormap=True):
+    """
     create guided Grad-Cam image for each class and fold
     :param layer_name: layer to compute gradients and GRAD-CAM;
     :param colormap: use the colormap for the result
     :return:
-    '''
+    """
     labels_index = {"0.0": 0, "1.0": 1, "2.0": 2, "3.0": 3, "4.0": 4}
     dir_for_gradCam = "data/gradCam"
     if not os.path.exists(dir_for_gradCam):
@@ -288,9 +303,16 @@ def compute_saliency_for_imgs():
             if not os.path.exists(path_for_picture_folder):
                 os.makedirs(path_for_picture_folder)
             img_path = join(path_to_data_of_class, img)
-            gradcam, gb, guided_gradcam = compute_saliency(model, guided_model, layer_name='last_conv',
-                                                           img_path=img_path, cls=labels_index[cl], visualize=False,
-                                                           save=path_for_picture_folder, img_name=str(K_FOLD))
+            gradcam, gb, guided_gradcam = compute_saliency(
+                model,
+                guided_model,
+                layer_name="last_conv",
+                img_path=img_path,
+                cls=labels_index[cl],
+                visualize=False,
+                save=path_for_picture_folder,
+                img_name=str(K_FOLD),
+            )
 
 
 def get_important_features(count_best=10):
@@ -309,33 +331,49 @@ def get_important_features(count_best=10):
             picture = load_image(picture_path, False)
             res += picture
         res /= N_FOLDS
-        res /= 255.
+        res /= 255.0
         imp_for_all_cl[cl] = res
 
-        cv2.imwrite(join(path_to_images, "class_" + str(cl) + ".jpg"), deprocess_image(res))
-        cv2.imwrite(join(path_to_images_with_clolormap, "class_" + str(cl) + ".jpg"),
-                    cv2.applyColorMap(deprocess_image(res), cv2.COLORMAP_WINTER))
+        cv2.imwrite(
+            join(path_to_images, "class_" + str(cl) + ".jpg"), deprocess_image(res)
+        )
+        cv2.imwrite(
+            join(path_to_images_with_clolormap, "class_" + str(cl) + ".jpg"),
+            cv2.applyColorMap(deprocess_image(res), cv2.COLORMAP_WINTER),
+        )
         res = res.flatten()
         # get more important genes
         most_importence = np.argsort(res)[-count_best:]
         genes_names = numbers_to_genes(most_importence)
 
         # print and save results
-        genes_with_importance = pd.DataFrame({'names': genes_names, 'imp': res[most_importence]})
+        genes_with_importance = pd.DataFrame(
+            {"names": genes_names, "imp": res[most_importence]}
+        )
         print("importent features for class " + str(cl))
         print(genes_with_importance)
-        plot = genes_with_importance.plot('names', 'imp', 'barh',
-                                          color=plt.cm.RdYlGn(np.linspace(0, 1, len(genes_names))),
-                                          figsize=(12, 7), legend=False)
+        plot = genes_with_importance.plot(
+            "names",
+            "imp",
+            "barh",
+            color=plt.cm.RdYlGn(np.linspace(0, 1, len(genes_names))),
+            figsize=(12, 7),
+            legend=False,
+        )
         plot.set_ylabel("Common genes", fontsize=10)
-        plot.set_xlabel('Feature importance', fontsize=10)
+        plot.set_xlabel("Feature importance", fontsize=10)
         # plot.get_figure().show()
         plot.get_figure().savefig(join(path_to_save, "class" + str(cl) + ".png"))
 
     imp_for_all_cl = np.mean(imp_for_all_cl, axis=0)
-    cv2.imwrite(join(path_to_images, "for_all_classes" + ".jpg"), deprocess_image(imp_for_all_cl))
-    cv2.imwrite(join(path_to_images_with_clolormap, "for_all_classes" + ".jpg"),
-                cv2.applyColorMap(deprocess_image(imp_for_all_cl), cv2.COLORMAP_WINTER))
+    cv2.imwrite(
+        join(path_to_images, "for_all_classes" + ".jpg"),
+        deprocess_image(imp_for_all_cl),
+    )
+    cv2.imwrite(
+        join(path_to_images_with_clolormap, "for_all_classes" + ".jpg"),
+        cv2.applyColorMap(deprocess_image(imp_for_all_cl), cv2.COLORMAP_WINTER),
+    )
 
     imp_for_all_cl = imp_for_all_cl.flatten()
     # get more important genes
@@ -343,14 +381,21 @@ def get_important_features(count_best=10):
     genes_names = numbers_to_genes(most_importence)
 
     # print and save results
-    genes_with_importance = pd.DataFrame({'names': genes_names, 'imp': imp_for_all_cl[most_importence]})
+    genes_with_importance = pd.DataFrame(
+        {"names": genes_names, "imp": imp_for_all_cl[most_importence]}
+    )
     print("importent features for all classes ")
     print(genes_with_importance)
-    plot = genes_with_importance.plot('names', 'imp', 'barh',
-                                      color=plt.cm.RdYlGn(np.linspace(0, 1, len(genes_names))),
-                                      figsize=(12, 10), legend=False)
+    plot = genes_with_importance.plot(
+        "names",
+        "imp",
+        "barh",
+        color=plt.cm.RdYlGn(np.linspace(0, 1, len(genes_names))),
+        figsize=(12, 10),
+        legend=False,
+    )
     plot.set_ylabel("Common biomarkers", fontsize=9)
-    plot.set_xlabel('Feature importance', fontsize=9)
+    plot.set_xlabel("Feature importance", fontsize=9)
     # plot.get_figure().show()
     plot.get_figure().savefig(join(path_to_save, "for_all_class" + ".png"))
 
@@ -370,15 +415,21 @@ def get_importent_areas():
         importences = dict()
         for h in range(0, INPUT_SHAPE[0] - shape[0], step):
             for w in range(0, INPUT_SHAPE[1] - shape[1], step):
-                importence = importance_of_part(picture[h:h + shape[0], w:w + shape[1]])
+                importence = importance_of_part(
+                    picture[h : h + shape[0], w : w + shape[1]]
+                )
                 importences[(h, w)] = importence
         # draw areas, the importance of which is greater then threshold
         threshold_for_importance = shape[0] * shape[1] * 2
-        importences = {k: v for k, v in importences.items() if v > threshold_for_importance}
+        importences = {
+            k: v for k, v in importences.items() if v > threshold_for_importance
+        }
 
         # sort
         draw_areas = dict()
-        sorted_imp = sorted(importences.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+        sorted_imp = sorted(
+            importences.items(), key=lambda kv: (kv[1], kv[0]), reverse=True
+        )
         # delete interceptions
         for place, im in sorted_imp:
             inter = False
@@ -393,7 +444,13 @@ def get_importent_areas():
         img = cv2.applyColorMap(deprocess_image(picture), cv2.COLORMAP_WINTER)
         img = cv2.resize(img, (int(img.shape[0] * 2), int(img.shape[1] * 2)))
         for k, v in draw_areas.items():
-            img = cv2.circle(img, ((k[1] + shape[1] // 2) * 2, (k[0] + shape[1] // 2) * 2), shape[1], (0, 0, 255), 2)
+            img = cv2.circle(
+                img,
+                ((k[1] + shape[1] // 2) * 2, (k[0] + shape[1] // 2) * 2),
+                shape[1],
+                (0, 0, 255),
+                2,
+            )
         cv2.imwrite(join(path_to_save, picture_name), img)
 
         # drow on each fold
@@ -401,12 +458,21 @@ def get_importent_areas():
             img_name = "class_" + str(cl) + ".0_fold=" + str(fold) + ".jpg"
             img = load_image(join(path_to_imgs, img_name), False)[:, :, 0]
             img_colormap = cv2.applyColorMap(deprocess_image(img), cv2.COLORMAP_WINTER)
-            img_colormap = cv2.resize(img_colormap, (int(img.shape[0] * 2), int(img.shape[1] * 2)))
+            img_colormap = cv2.resize(
+                img_colormap, (int(img.shape[0] * 2), int(img.shape[1] * 2))
+            )
             for k, v in draw_areas.items():
-                importence = importance_of_part(img[k[0]:k[0] + shape[0], k[1]:k[1] + shape[1]])
+                importence = importance_of_part(
+                    img[k[0] : k[0] + shape[0], k[1] : k[1] + shape[1]]
+                )
                 if importence > (v / 2):
-                    img_colormap = cv2.circle(img_colormap, ((k[1] + shape[1] // 2) * 2, (k[0] + shape[1] // 2) * 2),
-                                              shape[1], (0, 0, 255), 2)
+                    img_colormap = cv2.circle(
+                        img_colormap,
+                        ((k[1] + shape[1] // 2) * 2, (k[0] + shape[1] // 2) * 2),
+                        shape[1],
+                        (0, 0, 255),
+                        2,
+                    )
 
             cv2.imwrite(join(path_to_save, img_name), img_colormap)
 
@@ -422,7 +488,13 @@ def draw_grid():
     images_names = np.array(listdir(path_to_images)[5:])
     images_names = images_names.reshape((n_clases, n_folds))
     shape = cv2.imread(join(path_to_images, images_names[0, 0]), cv2.IMREAD_COLOR).shape
-    img = np.zeros(((shape[0] + retreat) * n_folds + start_y, (shape[1] + retreat) * n_clases + start_x, shape[2]))
+    img = np.zeros(
+        (
+            (shape[0] + retreat) * n_folds + start_y,
+            (shape[1] + retreat) * n_clases + start_x,
+            shape[2],
+        )
+    )
     img[:, :] = 255
     # add images to grid
     for i in range(n_folds):
@@ -430,10 +502,10 @@ def draw_grid():
             pos_y = start_y + i * (shape[0] + retreat)
             pos_x = start_x + j * (shape[1] + retreat)
             li = cv2.imread(join(path_to_images, images_names[j, i]), cv2.IMREAD_COLOR)
-            img[pos_y:pos_y + shape[0], pos_x: pos_x + shape[1], :] = li
+            img[pos_y : pos_y + shape[0], pos_x : pos_x + shape[1], :] = li
 
     # add text to grid
-    clases_names = ['BRCA', 'KIRC', 'COAD', 'LUAD', 'PRAD']
+    clases_names = ["BRCA", "KIRC", "COAD", "LUAD", "PRAD"]
     for i in range(n_clases):
         cv2.putText(
             img=img,
@@ -441,7 +513,8 @@ def draw_grid():
             org=(start_x + i * (shape[1] + retreat) + 70, 50),
             fontFace=cv2.FONT_HERSHEY_PLAIN,
             fontScale=3,
-            color=(0, 0, 0))
+            color=(0, 0, 0),
+        )
     for i in range(n_folds):
         cv2.putText(
             img=img,
@@ -449,28 +522,42 @@ def draw_grid():
             org=(0, start_y + i * (shape[1] + retreat) + 150),
             fontFace=cv2.FONT_HERSHEY_PLAIN,
             fontScale=3,
-            color=(255,150,100))
-    cv2.imwrite('grid.png', img)
+            color=(255, 150, 100),
+        )
+    cv2.imwrite("grid.png", img)
 
 
 def is_intersect(start_point1, start_point2, shape):
-    '''
+    """
     :param start_point1: position of left-up corner of first rectangle
     :param start_point2: position of left-up corner of second rectangle
     :param shape: length and width of the rectangle
     :return: whether 2 rectangles is intersecting
-    '''
-    if ((start_point1[0] <= start_point2[0] <= start_point1[0] + shape[0] and
-         start_point1[1] <= start_point2[1] <= start_point1[1] + shape[1])
-            or (
-                    (start_point2[0] <= start_point1[0] <= start_point2[0] + shape[0] and
-                     start_point1[1] <= start_point2[1] <= start_point1[1] + shape[1]))
-            or (
-                    (start_point1[0] <= start_point2[0] <= start_point1[0] + shape[0] and
-                     start_point2[1] <= start_point1[1] <= start_point2[1] + shape[1]))
-            or (
-                    (start_point2[0] <= start_point1[0] <= start_point2[0] + shape[0] and
-                     start_point2[1] <= start_point1[1] <= start_point2[1] + shape[1]))):
+    """
+    if (
+        (
+            start_point1[0] <= start_point2[0] <= start_point1[0] + shape[0]
+            and start_point1[1] <= start_point2[1] <= start_point1[1] + shape[1]
+        )
+        or (
+            (
+                start_point2[0] <= start_point1[0] <= start_point2[0] + shape[0]
+                and start_point1[1] <= start_point2[1] <= start_point1[1] + shape[1]
+            )
+        )
+        or (
+            (
+                start_point1[0] <= start_point2[0] <= start_point1[0] + shape[0]
+                and start_point2[1] <= start_point1[1] <= start_point2[1] + shape[1]
+            )
+        )
+        or (
+            (
+                start_point2[0] <= start_point1[0] <= start_point2[0] + shape[0]
+                and start_point2[1] <= start_point1[1] <= start_point2[1] + shape[1]
+            )
+        )
+    ):
         return True
     else:
         return False
@@ -485,7 +572,7 @@ def importance_of_part(area):
     return imp
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     for K_FOLD in range(0, 5):
         compute_saliency_for_classes(colormap=False)
     get_important_features()
